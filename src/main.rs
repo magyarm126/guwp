@@ -708,6 +708,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 #[derive(Default)]
 struct App {
     state: Option<State>,
+    #[cfg(windows)] //https://github.com/rust-windowing/winit/issues/2094
+    is_init: bool,
 }
 
 impl ApplicationHandler for App {
@@ -785,6 +787,11 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::Resized(size) => {
+                #[cfg(windows)]
+                if !self.is_init {
+                    self.is_init = true;
+                    return;
+                }
                 state.resize(size);
                 state.window.request_redraw();
             }
