@@ -2,13 +2,14 @@ use std::{num::NonZeroU64, str::FromStr};
 use wgpu::util::DeviceExt;
 
 fn main() {
-    let arguments: Vec<f32> = std::env::args()
+    let mut arguments: Vec<f32> = std::env::args()
         .skip(1)
         .map(|s| {
             f32::from_str(&s).unwrap_or_else(|_| panic!("Cannot parse argument {s:?} as a float."))
         })
         .collect();
 
+    arguments.push(1.0);
     if arguments.is_empty() {
         println!("No arguments provided. Please provide a list of numbers to double.");
         return;
