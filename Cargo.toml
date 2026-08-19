@@ -2,5 +2,10 @@
 name = "guwp"
 version = "0.1.0"
 edition = "2024"
+publish = false
 
 [dependencies]
+bytemuck = { version = "1.22.0", features = ["extern_crate_alloc"] }
+env_logger = "0.11"
+pollster = "1.0"
+wgpu = "30.0.0"
