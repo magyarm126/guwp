@@ -9,12 +9,13 @@ use winit::{
     window::WindowId,
 };
 
+#[derive(Default)]
 pub struct App {
     state: Option<State>,
 }
 
 impl App {
-    pub(crate) fn from_event_loop(event_loop: &EventLoop<()>) -> Self {
+    fn from_event_loop(event_loop: &ActiveEventLoop) -> State {
         let window = Arc::new(
             event_loop
                 .create_window(
@@ -27,14 +28,12 @@ impl App {
                 .unwrap(),
         );
         let state = pollster::block_on(State::new(window));
-        App {
-            state: Some(state),
-        }
+        state
     }
 }
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.state.as_ref().unwrap().window.request_redraw();
+        self.state = Some(Self::from_event_loop(event_loop));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
