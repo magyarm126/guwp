@@ -5,21 +5,16 @@ use winit::{
     event_loop::ActiveEventLoop,
     window::WindowId,
 };
+use winit::event_loop::EventLoop;
 use winit::window::Window;
 use crate::wgpu::state::State;
 
 pub struct App {
-    window: Option<Arc<Window>>,
-    state: Option<State<'static>>,
+    state: Option<State>,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        return App { window: None, state: None };
-    }
-}
-impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+impl App {
+    pub(crate) fn from_event_loop(event_loop: &EventLoop<()>) -> Self {
         let window = Arc::new(
             event_loop
                 .create_window(
@@ -31,17 +26,22 @@ impl ApplicationHandler for App {
                 )
                 .unwrap(),
         );
-        window.request_redraw();
-        self.window = Some(window);
+        let state = pollster::block_on(State::new(window));
+        App {
+            state: Some(state),
+        }
+    }
+}
+impl ApplicationHandler for App {
+    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.state.as_ref().unwrap().window.request_redraw();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => {event_loop.exit();}
             WindowEvent::RedrawRequested => {
-                if let Some(window) = &self.window {
-                    window.request_redraw();
-                }
+                self.state.as_ref().unwrap().window.request_redraw();
             }
             _ => {}
         }
