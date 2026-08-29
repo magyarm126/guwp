@@ -66,7 +66,7 @@ impl State {
         State { surface, device, queue, config, size, window }
     }
 
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub(crate) fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         // Guard against a zero-sized surface (e.g. when minimised), which is
         // invalid and would make the GPU error.
         if new_size.width > 0 && new_size.height > 0 {
@@ -79,7 +79,7 @@ impl State {
 
     // Draws one frame. Returns nothing — acquiring the surface texture gives
     // back an enum we match on, handling each outcome inline.
-    fn render(&mut self) {
+    pub(crate) fn render(&mut self) {
         // get_current_texture() returns a CurrentSurfaceTexture enum. We pull
         // the texture out of the usable variants and bail early on the rest.
         let output = match self.surface.get_current_texture() {
