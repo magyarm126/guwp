@@ -149,7 +149,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         let num_vertices = Vertex::get_tringle_vector().len() as u32;
 
-        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices: 0, window }
+        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices, window }
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
