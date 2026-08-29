@@ -34,6 +34,7 @@ impl App {
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.state = Some(Self::from_event_loop(event_loop));
+        self.state.as_mut().unwrap().redraw();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {

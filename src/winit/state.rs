@@ -16,6 +16,10 @@ pub(crate) struct State {
 }
 
 impl State {
+
+    pub fn redraw(&mut self) {
+        self.window.request_redraw();
+    }
     pub async fn new(window: Arc<Window>) -> State {
         let size = window.inner_size();
 
