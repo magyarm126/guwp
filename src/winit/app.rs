@@ -42,8 +42,8 @@ impl ApplicationHandler for App {
             WindowEvent::CloseRequested => {event_loop.exit();}
             WindowEvent::RedrawRequested => {
                 self.state.as_mut().unwrap().render();
-                self.state.as_ref().unwrap().window.request_redraw();
             }
+            WindowEvent::Resized(physical_size) => self.state.as_mut().unwrap().resize(physical_size),
             _ => {}
         }
     }
