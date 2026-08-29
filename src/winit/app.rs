@@ -6,14 +6,16 @@ use winit::{
     window::WindowId,
 };
 use winit::window::Window;
+use crate::wgpu::state::State;
 
 pub struct App {
     window: Option<Arc<Window>>,
+    state: Option<State<'static>>,
 }
 
 impl Default for App {
     fn default() -> Self {
-        return App { window: None };
+        return App { window: None, state: None };
     }
 }
 impl ApplicationHandler for App {
