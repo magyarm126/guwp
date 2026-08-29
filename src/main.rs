@@ -1,6 +1,7 @@
 use ::winit::event_loop::{ControlFlow, EventLoop};
 use crate::winit::app::App;
 mod winit;
+mod wgpu;
 
 fn main() {
     env_logger::init();
