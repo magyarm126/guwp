@@ -7,14 +7,14 @@ Pod (plain old data) and Zeroable from bytemuck certify that the bytes can be sa
 
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
-struct Vertex {
+pub struct Vertex {
     position: [f32; 3],
     color: [f32; 3],
 }
 
 impl Vertex {
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
+    pub fn desc<'a>() -> Option<wgpu::VertexBufferLayout<'a>> {
+        Some(wgpu::VertexBufferLayout {
             array_stride: size_of::<Vertex>() as wgpu::BufferAddress,
             step_mode: wgpu::VertexStepMode::Vertex,
             attributes: &[
@@ -29,12 +29,12 @@ impl Vertex {
                     format: wgpu::VertexFormat::Float32x3,
                 },
             ],
-        }
+        })
     }
 
     //.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
 
-    fn get_tringle_vector() -> Vec<Vertex> {
+    pub fn get_tringle_vector() -> Vec<Vertex> {
         vec![
             Vertex { position: [0.0,  0.5, 0.0], color: [1.0, 0.0, 0.0] },
             Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },

@@ -1,1 +1,1 @@
-mod vertex;
+pub mod vertex;
