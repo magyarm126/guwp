@@ -1,13 +1,13 @@
+use crate::winit::state::State;
 use std::sync::Arc;
+use winit::event_loop::EventLoop;
+use winit::window::Window;
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
     event_loop::ActiveEventLoop,
     window::WindowId,
 };
-use winit::event_loop::EventLoop;
-use winit::window::Window;
-use crate::wgpu::state::State;
 
 pub struct App {
     state: Option<State>,
