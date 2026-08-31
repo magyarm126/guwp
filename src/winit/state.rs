@@ -63,6 +63,9 @@ impl State {
             .find(|f| f.is_srgb())
             .unwrap_or(surface_caps.formats[0]);
 
+        println!("Present modes: {:?}", surface_caps.present_modes);
+        println!("Alpha modes: {:?}", surface_caps.alpha_modes);
+
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
@@ -176,11 +179,18 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let now = Instant::now();
         let dt = now - self.last_frame;
 
+        /*
         let frame_dt = now.duration_since(self.last_frame);
         println!(
             "event dt: {:.2} ms",
             frame_dt.as_secs_f64() * 1000.0
         );
+
+         */
+
+        let fps = 1.0 / dt.as_secs_f64();
+        println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
+
 
         self.last_frame = now;
 
@@ -203,7 +213,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.vertices = vertices;
     }
 
-    pub fn render(&mut self) {
+    pub fn render(&mut self) -> bool {
         //return;
 
         let start = Instant::now();
@@ -211,35 +221,41 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let output = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(texture)
             | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
-                println!("SUCCESS");
+                //println!("SUCCESS");
                 texture
             },
-            wgpu::CurrentSurfaceTexture::Timeout
-            | wgpu::CurrentSurfaceTexture::Occluded => {
+
+            wgpu::CurrentSurfaceTexture::Timeout => {
+                println!("Timeout");
+                return false;
+            }
+
+            wgpu::CurrentSurfaceTexture::Occluded => {
                 println!("Occluded");
-                return
-            },
+                return false;
+            }
+
             wgpu::CurrentSurfaceTexture::Outdated
             | wgpu::CurrentSurfaceTexture::Lost => {
                 println!("Lost");
                 self.surface.configure(&self.device, &self.config);
-                return;
+                return false;
             }
+
             wgpu::CurrentSurfaceTexture::Validation => {
                 println!("Validation");
-                return
-            },
+                return false;
+            }
         };
 
+
+        /*
         println!(
             "acquire: {:.3} ms",
             start.elapsed().as_secs_f64() * 1000.0
         );
-        
-        drop(output);
 
-        return;
-
+         */
 
         let after_acquire = Instant::now();
 
@@ -287,5 +303,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             (after_present - after_submit).as_secs_f64() * 1000.0,
         );
          */
+
+        return true;
     }
 }

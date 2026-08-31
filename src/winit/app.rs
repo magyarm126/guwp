@@ -56,9 +56,13 @@ impl ApplicationHandler for App {
 
                 let after_update = Instant::now();
 
-                state.render();
 
-                let after_render = Instant::now();
+                let mut after_render;
+
+                if state.render() {
+                    after_render = Instant::now();
+                    state.redraw();
+                }
 
                 /*
                 println!(
@@ -68,17 +72,13 @@ impl ApplicationHandler for App {
                     (after_render - start).as_secs_f64() * 1000.0,
                 );
                  */
-
-                state.update();
-                state.render();
-                state.redraw();
             }
             WindowEvent::Resized(physical_size) => {
                 state.resize(physical_size);
                 state.redraw();
             },
             WindowEvent::CursorMoved { position, .. } => {
-                println!("cursor: {:?}", position);
+                //println!("cursor: {:?}", position);
             }
             _ => {
                 //println!("Unhandled event: {:?}", event);
