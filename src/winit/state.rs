@@ -15,7 +15,7 @@ pub(crate) struct State {
     num_vertices: u32,
     window: Arc<Window>,
     vertices: Vec<Vertex>,
-    last_frame: Instant,
+    pub last_frame: Instant,
     pub loopcounter: i64,
 }
 
@@ -72,7 +72,7 @@ impl State {
             present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
-            desired_maximum_frame_latency: 2,
+            desired_maximum_frame_latency: 1,
         };
 
         surface.configure(&device, &config);
@@ -175,10 +175,14 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         let now = Instant::now();
         let dt = now - self.last_frame;
-        self.last_frame = now;
 
-        let fps = 1.0 / dt.as_secs_f64();
-        //println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
+        let frame_dt = now.duration_since(self.last_frame);
+        println!(
+            "event dt: {:.2} ms",
+            frame_dt.as_secs_f64() * 1000.0
+        );
+
+        self.last_frame = now;
 
 
         let vertices = self.vertices.clone()
@@ -200,19 +204,45 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
     }
 
     pub fn render(&mut self) {
+        //return;
+
+        let start = Instant::now();
 
         let output = match self.surface.get_current_texture() {
             wgpu::CurrentSurfaceTexture::Success(texture)
-            | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => texture,
+            | wgpu::CurrentSurfaceTexture::Suboptimal(texture) => {
+                println!("SUCCESS");
+                texture
+            },
             wgpu::CurrentSurfaceTexture::Timeout
-            | wgpu::CurrentSurfaceTexture::Occluded => return,
+            | wgpu::CurrentSurfaceTexture::Occluded => {
+                println!("Occluded");
+                return
+            },
             wgpu::CurrentSurfaceTexture::Outdated
             | wgpu::CurrentSurfaceTexture::Lost => {
+                println!("Lost");
                 self.surface.configure(&self.device, &self.config);
                 return;
             }
-            wgpu::CurrentSurfaceTexture::Validation => return,
+            wgpu::CurrentSurfaceTexture::Validation => {
+                println!("Validation");
+                return
+            },
         };
+
+        println!(
+            "acquire: {:.3} ms",
+            start.elapsed().as_secs_f64() * 1000.0
+        );
+        
+        drop(output);
+
+        return;
+
+
+        let after_acquire = Instant::now();
+
         let view = output.texture.create_view(&wgpu::TextureViewDescriptor::default());
 
         let mut encoder = self.device.create_command_encoder(
@@ -242,7 +272,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         }
         self.queue.submit(std::iter::once(encoder.finish()));
 
+        let after_submit = Instant::now();
+
         self.window.pre_present_notify();
         self.queue.present(output);
+
+        let after_present = Instant::now();
+
+        /*
+        println!(
+            "acquire: {:.2} ms | submit: {:.2} ms | present: {:.2} ms",
+            (after_acquire - start).as_secs_f64() * 1000.0,
+            (after_submit - after_acquire).as_secs_f64() * 1000.0,
+            (after_present - after_submit).as_secs_f64() * 1000.0,
+        );
+         */
     }
 }

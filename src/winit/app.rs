@@ -1,5 +1,6 @@
 use crate::winit::state::State;
 use std::sync::Arc;
+use std::time::Instant;
 use winit::event_loop::EventLoop;
 use winit::window::Window;
 use winit::{
@@ -45,7 +46,29 @@ impl ApplicationHandler for App {
         match event {
             WindowEvent::CloseRequested => {event_loop.exit();}
             WindowEvent::RedrawRequested => {
+
+                let state = self.state.as_mut().unwrap();
+
                 state.loopcounter += 1;
+                let start = Instant::now();
+
+                state.update();
+
+                let after_update = Instant::now();
+
+                state.render();
+
+                let after_render = Instant::now();
+
+                /*
+                println!(
+                    "update: {:.3} ms | render: {:.3} ms | total: {:.3} ms",
+                    (after_update - start).as_secs_f64() * 1000.0,
+                    (after_render - after_update).as_secs_f64() * 1000.0,
+                    (after_render - start).as_secs_f64() * 1000.0,
+                );
+                 */
+
                 state.update();
                 state.render();
                 state.redraw();
@@ -54,6 +77,9 @@ impl ApplicationHandler for App {
                 state.resize(physical_size);
                 state.redraw();
             },
+            WindowEvent::CursorMoved { position, .. } => {
+                println!("cursor: {:?}", position);
+            }
             _ => {
                 //println!("Unhandled event: {:?}", event);
             }
