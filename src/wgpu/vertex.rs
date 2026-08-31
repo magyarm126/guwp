@@ -8,8 +8,8 @@ Pod (plain old data) and Zeroable from bytemuck certify that the bytes can be sa
 #[repr(C)]
 #[derive(Copy, Clone, Debug, Pod, Zeroable)]
 pub struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
+    pub position: [f32; 3],
+    pub color: [f32; 3],
 }
 
 impl Vertex {

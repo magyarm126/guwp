@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Instant;
 use wgpu::util::DeviceExt;
 use winit::window::Window;
 use crate::wgpu::vertex::Vertex;
@@ -13,6 +14,8 @@ pub(crate) struct State {
     vertex_buffer: wgpu::Buffer,
     num_vertices: u32,
     window: Arc<Window>,
+    vertices: Vec<Vertex>,
+    last_frame: Instant,
 }
 
 impl State {
@@ -145,15 +148,17 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             cache: None,
         });
 
+        let vertices = Vertex::get_tringle_vector();
+
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(Vertex::get_tringle_vector().as_slice()),
+            contents: bytemuck::cast_slice(vertices.as_slice()),
             usage: wgpu::BufferUsages::VERTEX,
         });
 
-        let num_vertices = Vertex::get_tringle_vector().len() as u32;
+        let num_vertices = vertices.len() as u32;
 
-        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices, window }
+        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices, window, vertices, last_frame: Instant::now() }
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -163,6 +168,32 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             self.config.height = new_size.height;
             self.surface.configure(&self.device, &self.config);
         }
+    }
+
+    pub fn update(&mut self) {
+
+        let now = Instant::now();
+        let dt = now - self.last_frame;
+        self.last_frame = now;
+
+        println!("dt: {:.2} ms", dt.as_secs_f64() * 1000.0);
+
+        let vertices = self.vertices.clone()
+            .into_iter()
+            .map(|mut vertex| {
+                vertex.position[1] += 0.0001f32;
+                vertex
+            })
+            .collect::<Vec<_>>();
+
+        self.vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Vertex Buffer"),
+            contents: bytemuck::cast_slice(vertices.as_slice()),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
+        self.num_vertices = Vertex::get_tringle_vector().len() as u32;
+        self.vertices = vertices;
     }
 
     pub fn render(&mut self) {
