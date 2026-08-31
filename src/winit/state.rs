@@ -68,7 +68,7 @@ impl State {
             color_space: Default::default(),
             width: size.width,
             height: size.height,
-            present_mode: wgpu::PresentMode::AutoNoVsync,
+            present_mode: wgpu::PresentMode::AutoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
@@ -153,7 +153,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Vertex Buffer"),
             contents: bytemuck::cast_slice(vertices.as_slice()),
-            usage: wgpu::BufferUsages::VERTEX,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         });
 
         let num_vertices = vertices.len() as u32;
@@ -176,7 +176,9 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         let dt = now - self.last_frame;
         self.last_frame = now;
 
-        println!("dt: {:.2} ms", dt.as_secs_f64() * 1000.0);
+        let fps = 1.0 / dt.as_secs_f64();
+        println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
+
 
         let vertices = self.vertices.clone()
             .into_iter()
@@ -186,11 +188,11 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
             })
             .collect::<Vec<_>>();
 
-        self.vertex_buffer = self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(vertices.as_slice()),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        self.queue.write_buffer(
+            &self.vertex_buffer,
+            0,
+            bytemuck::cast_slice(&vertices),
+        );
 
         self.num_vertices = Vertex::get_tringle_vector().len() as u32;
         self.vertices = vertices;
