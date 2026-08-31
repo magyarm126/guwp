@@ -38,15 +38,25 @@ impl ApplicationHandler for App {
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+        let Some(state) = self.state.as_mut() else {
+            return;
+        };
+
         match event {
             WindowEvent::CloseRequested => {event_loop.exit();}
             WindowEvent::RedrawRequested => {
-                self.state.as_mut().unwrap().update();
-                self.state.as_mut().unwrap().render();
-                self.state.as_mut().unwrap().redraw();
+                state.loopcounter += 1;
+                state.update();
+                state.render();
+                state.redraw();
             }
-            WindowEvent::Resized(physical_size) => self.state.as_mut().unwrap().resize(physical_size),
-            _ => {}
+            WindowEvent::Resized(physical_size) => {
+                state.resize(physical_size);
+                state.redraw();
+            },
+            _ => {
+                //println!("Unhandled event: {:?}", event);
+            }
         }
     }
 }

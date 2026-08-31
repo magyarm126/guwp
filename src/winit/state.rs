@@ -16,6 +16,7 @@ pub(crate) struct State {
     window: Arc<Window>,
     vertices: Vec<Vertex>,
     last_frame: Instant,
+    pub loopcounter: i64,
 }
 
 impl State {
@@ -158,7 +159,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
 
         let num_vertices = vertices.len() as u32;
 
-        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices, window, vertices, last_frame: Instant::now() }
+        State { surface, device, queue, config, size, render_pipeline, vertex_buffer, num_vertices, window, vertices, last_frame: Instant::now(), loopcounter: 0 }
     }
 
     pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -177,13 +178,13 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         self.last_frame = now;
 
         let fps = 1.0 / dt.as_secs_f64();
-        println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
+        //println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
 
 
         let vertices = self.vertices.clone()
             .into_iter()
             .map(|mut vertex| {
-                vertex.position[1] += 0.0001f32;
+                vertex.position[1] += 0.2f32 * dt.as_secs_f32();
                 vertex
             })
             .collect::<Vec<_>>();
