@@ -1,0 +1,317 @@
+RAG SUMMARY — Winit + WGPU VSync / Window Dragging Investigation
+
+Environment:
+- Rust
+- winit = 0.30.8
+- wgpu = 30.0.0
+- Windows desktop
+- Renderer uses wgpu Surface + RedrawRequested event loop
+- Event loop initially used ControlFlow::Wait
+- Surface present modes reported:
+  [Fifo, FifoRelaxed, Mailbox, Immediate]
+- Surface alpha modes:
+  [Opaque, PreMultiplied]
+
+Current rendering architecture:
+- `ApplicationHandler::resumed()` creates the window and `State`.
+- `resumed()` calls `state.redraw()`.
+- `WindowEvent::RedrawRequested` calls:
+  1. `update()`
+  2. `render()`
+  3. `redraw()` / `window.request_redraw()`
+- `render()` uses `surface.get_current_texture()`, submits commands, then:
+  `window.pre_present_notify();`
+  `queue.submit(...)`
+  `surface texture is presented with queue.present(output)`.
+- `SurfaceConfiguration.present_mode` was originally `AutoVsync`.
+- `desired_maximum_frame_latency` was changed from 10 to 2.
+
+IMPORTANT FINDING:
+The problem is NOT primarily the simulation/update loop.
+
+When the window is NOT being moved:
+- With polling/event timing, frame/event dt is very stable around ~4.0–4.5 ms.
+- With a high-refresh setup this corresponds to roughly 220–250 FPS.
+- Rendering works normally.
+
+When the window IS being dragged:
+- Event dt becomes highly irregular:
+  examples:
+    22.44 ms
+    3.65 ms
+    9.24 ms
+    22.85 ms
+    21.52 ms
+    3.63 ms
+    17.85 ms
+    4.38 ms
+    ...
+    42.58 ms
+- This proves the main thread/event delivery is being disrupted during interactive window movement.
+
+More importantly, timing inside `render()` showed that `get_current_texture()` itself becomes the source of the stalls.
+
+When NOT moving:
+    SUCCESS
+    acquire: ~3.5 ms
+    event dt: ~4.1 ms
+
+When MOVING:
+    SUCCESS
+    acquire: 43.719 ms
+    event dt: 44.40 ms
+
+    SUCCESS
+    acquire: 32.675 ms
+    event dt: 34.49 ms
+
+    SUCCESS
+    acquire: 6.972 ms
+    event dt: 8.30 ms
+
+    SUCCESS
+    acquire: 13.423 ms
+    event dt: 14.31 ms
+
+    SUCCESS
+    acquire: 56.101 ms
+    event dt: 57.39 ms
+
+    SUCCESS
+    acquire: 66.461 ms
+    event dt: 67.67 ms
+
+    SUCCESS
+    acquire: 70.861 ms
+    event dt: 72.30 ms
+
+Thus the CPU is actually blocking/stalling in:
+    surface.get_current_texture()
+
+during interactive window movement.
+
+This is why measuring only `submit()` and `present()` was misleading:
+- submit was consistently around ~0.2–0.3 ms
+- present was around ~0.1–0.2 ms
+- acquire was the operation exhibiting huge stalls.
+
+Another important experiment:
+Replacing render with an immediate `return` makes dragging smooth.
+
+Then a more isolated test was performed:
+
+    let output = match self.surface.get_current_texture() {
+        ...
+    };
+
+    drop(output);
+    return;
+
+Even though no rendering commands are submitted, simply calling `get_current_texture()` causes the application to become choppy during dragging.
+
+This confirms the rendering commands themselves are NOT the root cause.
+
+During another test, `get_current_texture()` sometimes returned:
+- `Success`
+- followed by `Timeout`
+- and eventually `Occluded`
+
+Example:
+    event dt: 13.82 ms
+    SUCCESS
+    acquire: 0.122 ms
+    event dt: 0.43 ms
+    Occluded
+    event dt: 1001.60 ms
+    Occluded
+    event dt: 1000.30 ms
+    Occluded
+
+The `Occluded` result was initially concerning, but the key observation is that the surface acquisition/presentation synchronization behavior changes dramatically during window movement.
+
+The user also confirmed that with a "no-vsync" configuration, the absolute timing is better on the current high-end machine, but this is not considered a valid solution because:
+- It still causes timing spikes.
+- The machine is fast enough that the spikes are less visually obvious.
+- On a normal/low-end PC, running at thousands of FPS would not hide the problem.
+- The desired solution is proper VSync/frame pacing, not merely disabling synchronization.
+
+IMPORTANT CONCEPT FROM THE WINIT DISCUSSION:
+The quoted winit GitHub issue is about a distinction between:
+
+1. Graphics API VSync / presentation synchronization
+2. Frame throttling
+3. Frame pacing
+4. Compositor-driven rendering
+
+The key point from the discussion is:
+
+Using FIFO/VSync does NOT necessarily mean an application should rely on
+`get_current_texture()` / swapchain acquisition blocking as its frame scheduler.
+
+On some composited systems, especially Wayland and potentially during window operations, presentation can be asynchronous and the graphics API may not provide the desired "wake me exactly when it is appropriate to render" behavior.
+
+The winit issue discusses a desired frame-throttling mechanism where the window system/compositor provides a signal corresponding to display refresh/frame availability.
+
+The important quote/idea from the discussion:
+- FIFO can cause the application to enqueue multiple frames.
+- During resizing/moving, this can result in the application getting behind the compositor.
+- Blocking on graphics API acquisition/presentation is not necessarily a reliable frame pacing mechanism.
+- External frame throttling / compositor feedback can provide better behavior.
+- MAILBOX can improve responsiveness because it avoids building a long FIFO queue.
+
+PRESENT MODE FINDINGS:
+Available modes are:
+    Fifo
+    FifoRelaxed
+    Mailbox
+    Immediate
+
+Definitions:
+
+Fifo:
+- Traditional VSync.
+- Frames are queued in presentation order.
+- Application can block or otherwise become synchronized with the presentation queue.
+- Can cause latency/backlog problems if the application keeps submitting frames faster than the compositor consumes them.
+- It is not equivalent to an ideal non-blocking frame scheduler.
+
+FifoRelaxed:
+- Similar to FIFO, but allows a late frame to be presented immediately rather than waiting for the next refresh.
+- Can reduce severe stalls/tearing behavior when missing VBlank.
+- Still fundamentally FIFO-oriented.
+
+Mailbox:
+- VSync-like presentation without accumulating a long FIFO backlog.
+- The newest completed frame replaces an older waiting frame.
+- Typically gives much lower latency and better responsiveness.
+- Can run the application faster than the display refresh, while the compositor/display chooses the latest available frame.
+- This is especially interesting for interactive movement/resizing.
+- It is NOT "traditional VSync" in the sense of blocking the application to one CPU frame per refresh.
+- It can be combined with application-side frame throttling for a good low-latency VSync-like architecture.
+
+Immediate:
+- No synchronization to VBlank.
+- Frames are presented as soon as possible.
+- Can tear.
+- Not the desired final solution.
+
+CURRENT CONFIGURATION DETAIL:
+`desired_maximum_frame_latency` was changed to 2 (NOT 10).
+
+Current relevant configuration is conceptually:
+
+    SurfaceConfiguration {
+        usage: RENDER_ATTACHMENT,
+        format: surface_format,
+        width,
+        height,
+        present_mode: ...,
+        alpha_mode: ...,
+        view_formats: vec![],
+        desired_maximum_frame_latency: 2,
+    }
+
+The reduction from 10 to 2 was attempted specifically to reduce buffering/latency/backlog.
+
+IMPORTANT CONCLUSION:
+The evidence strongly points toward synchronization/frame-pacing interaction between:
+- winit's `RedrawRequested` loop
+- WGPU surface acquisition
+- the compositor/window-manager's handling of interactive window movement
+- VSync/presentation queue behavior
+
+rather than GPU rendering performance.
+
+The strongest evidence is:
+
+    `get_current_texture()` alone
+    -> large stalls while dragging
+
+while:
+
+    return before `get_current_texture()`
+    -> smooth dragging
+
+Therefore:
+- Shader complexity is irrelevant.
+- Vertex count is irrelevant.
+- `queue.submit()` is not the cause.
+- `present()` is not the primary measured cause.
+- `update()` is not the primary cause.
+- The problem happens before rendering commands are even submitted.
+
+NEXT DIRECTION:
+Do NOT keep trying to optimize the shader/render pass.
+
+The investigation should focus on proper frame scheduling rather than relying on:
+    window.request_redraw()
+    -> RedrawRequested
+    -> get_current_texture()
+    -> VSync blocks
+
+Potential architecture to investigate:
+
+A. Use MAILBOX + explicit frame throttling/frame pacing.
+   - Avoid relying on swapchain acquisition as the timing mechanism.
+   - Schedule rendering approximately once per display refresh.
+   - Keep the main event loop responsive during window movement.
+
+B. Investigate winit's frame-throttling / redraw scheduling support in 0.30.x.
+   - The GitHub discussion indicates this was specifically a problem winit was trying to solve.
+   - The important distinction is "VSync presentation" vs "frame throttling source".
+   - Need to determine exactly what winit 0.30.8 exposes and what is available on the current platform.
+
+C. Potentially use `ControlFlow::WaitUntil` / explicit frame timing rather than continuously requesting redraw from inside `RedrawRequested`.
+   - This avoids using graphics API blocking as the frame limiter.
+   - The timing target should ideally be tied to the display refresh.
+   - A fixed timer such as 16.67 ms is only an approximation and is not ideal for high-refresh/VRR displays.
+
+D. Continue using `pre_present_notify()` correctly if required by the platform/backend.
+   - It was already present in the renderer.
+   - The winit discussion specifically mentions this as relevant to compositor/frame scheduling.
+
+CURRENT WORKING HYPOTHESIS:
+The application is currently using `get_current_texture()` as an implicit frame limiter because VSync/presentation synchronization is causing acquisition to wait.
+
+During interactive window movement, the OS compositor/window manager changes how the surface is processed. This causes `get_current_texture()` to block for irregular amounts of time (6–70+ ms observed), which then blocks the winit event loop.
+
+That produces:
+    compositor/window drag
+        ↓
+    surface acquisition stalls
+        ↓
+    event loop blocked
+        ↓
+    irregular RedrawRequested timing
+        ↓
+    choppy simulation/input/rendering
+        ↓
+    poor window responsiveness
+
+The desired architecture is:
+    display/compositor timing
+        ↓
+    schedule frame
+        ↓
+    update
+        ↓
+    render
+        ↓
+    submit/present
+        ↓
+    remain responsive during window drag
+
+rather than:
+    request_redraw
+        ↓
+    render
+        ↓
+    get_current_texture blocks until VSync
+        ↓
+    event loop stalls
+
+One additional observation:
+When `ControlFlow::Poll` was tested, the non-moving event dt became extremely stable around 4 ms, but moving the window still produced large spikes. Therefore changing Wait/Poll alone does not solve the fundamental problem.
+
+FINAL DIAGNOSIS:
+This is a frame-pacing / compositor synchronization issue, not a raw rendering-performance issue. The critical operation is `wgpu::Surface::get_current_texture()`, whose behavior changes dramatically during interactive window dragging. The next step should be designing a non-blocking, display-paced rendering loop (likely involving MAILBOX + explicit frame throttling or winit's appropriate frame-throttling mechanism), while retaining a real VSync-capable presentation mode.
