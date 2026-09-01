@@ -189,7 +189,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
          */
 
         let fps = 1.0 / dt.as_secs_f64();
-        //println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
+        println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
 
         self.last_frame = now;
 
