@@ -9,8 +9,8 @@ fn main() {
     let event_loop = EventLoop::new().unwrap();
     event_loop.set_control_flow(ControlFlow::Wait);
 
-    let mut app = App::default();
+    let app = App::default();
 
-    event_loop.run_app(&mut app).unwrap();
+    event_loop.run_app(app).unwrap();
 
 }

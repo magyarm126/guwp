@@ -9,4 +9,4 @@ bytemuck = { version = "1.22.0", features = ["extern_crate_alloc"] }
 env_logger = "0.11"
 pollster = "1.0"
 wgpu = "30.0.0"
-winit = { version = "0.30.8", features = ["android-native-activity"] }
+winit = { version = "0.31.0-beta.2", features = ["android-native-activity"] }

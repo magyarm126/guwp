@@ -1,8 +1,7 @@
 use crate::winit::state::State;
 use std::sync::Arc;
 use std::time::Instant;
-use winit::event_loop::EventLoop;
-use winit::window::Window;
+use winit::window::{Window, WindowAttributes};
 use winit::{
     application::ApplicationHandler,
     event::WindowEvent,
@@ -16,15 +15,12 @@ pub struct App {
 }
 
 impl App {
-    fn from_event_loop(event_loop: &ActiveEventLoop) -> State {
-        let window = Arc::new(
+    fn from_event_loop(event_loop: &dyn ActiveEventLoop) -> State {
+        let window: Arc<dyn Window> = Arc::from(
             event_loop
                 .create_window(
-                    Window::default_attributes()
+                    WindowAttributes::default()
                         .with_title("GUWP")
-                        .with_inner_size(
-                            winit::dpi::PhysicalSize::new(800, 600),
-                        ),
                 )
                 .unwrap(),
         );
@@ -33,12 +29,12 @@ impl App {
     }
 }
 impl ApplicationHandler for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+    fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         self.state = Some(Self::from_event_loop(event_loop));
         self.state.as_mut().unwrap().redraw();
     }
 
-    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
+    fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, _window_id: WindowId, event: WindowEvent) {
         let Some(state) = self.state.as_mut() else {
             return;
         };
@@ -73,13 +69,10 @@ impl ApplicationHandler for App {
                 );
                  */
             }
-            WindowEvent::Resized(physical_size) => {
+            WindowEvent::SurfaceResized(physical_size) => {
                 state.resize(physical_size);
                 state.redraw();
             },
-            WindowEvent::CursorMoved { position, .. } => {
-                //println!("cursor: {:?}", position);
-            }
             _ => {
                 //println!("Unhandled event: {:?}", event);
             }

@@ -13,7 +13,7 @@ pub(crate) struct State {
     render_pipeline: wgpu::RenderPipeline,
     vertex_buffer: wgpu::Buffer,
     num_vertices: u32,
-    window: Arc<Window>,
+    window: Arc<dyn Window>,
     vertices: Vec<Vertex>,
     pub last_frame: Instant,
     pub loopcounter: i64,
@@ -24,8 +24,8 @@ impl State {
     pub fn redraw(&mut self) {
         self.window.request_redraw();
     }
-    pub async fn new(window: Arc<Window>) -> State {
-        let size = window.inner_size();
+    pub async fn new(window: Arc<dyn Window>) -> State {
+        let size = window.surface_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
             backends: wgpu::Backends::all(),
@@ -189,8 +189,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
          */
 
         let fps = 1.0 / dt.as_secs_f64();
-        println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
-
+        //println!("dt: {:.2} ms | FPS: {:.0}", dt.as_secs_f64() * 1000.0, fps);
 
         self.last_frame = now;
 
